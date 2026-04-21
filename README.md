@@ -8,10 +8,12 @@ Activate it:
 
 Windows:
 venv\Scripts\activate
+
 Mac/Linux:
 source venv/bin/activate
+
  3. Install requirements.txt
 pip install -r requirements.txt
+ 
  4. Run Flask app
-
 python app.py
