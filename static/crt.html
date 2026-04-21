@@ -1,0 +1,9 @@
+<form action="/crt" method="post">
+<input type="text" name="data" placeholder="product details" value="">
+<textarea name="i_d" readonly>{{ i_d }}</textarea>
+<button type="submit" name="action" value="generate">Generate QR Code</button>
+<br> <textarea readonly>{{ data }}</textarea>
+
+<img src="/{{ img_url }}?v={{ cache_bust }}" alt="my image">
+
+</form>

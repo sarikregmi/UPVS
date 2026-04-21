@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>QR Code Verification</h1>
+    <h1>{{ finding }}</h1>
+    <h2>QR Code Details {{ data }}</h2>
+    <h2>QR Code Image</h2>
+    <img src="{{ image_url }}" alt="QR Code Image">
+{% endblock %}

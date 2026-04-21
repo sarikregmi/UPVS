@@ -1,0 +1,16 @@
+<form action="/admin" method="post">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" required><br><br>
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required><br><br>
+    <label for="role">Role:</label>
+    <select id="role" name="role">
+        <option value="mec">Manufacturer</option>
+        <option value="cem">Seller</option>
+        <option value="emc">Admin</option>
+    </select><br><br>
+    <input type="submit" value="Create User">
+</form>
+<form action="/logout" method="post">
+    <button type="submit">Logout</button>
+</form>
