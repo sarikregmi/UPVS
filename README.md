@@ -1,6 +1,6 @@
  1. Clone the repo (if not already done)
-git clone https://github.com/username/repo-name.git
-cd repo-name
+git clone https://github.com/sarikregmi/UPVS.git
+cd UPVS
 2. Create a virtual environment (recommended)
 python -m venv venv
 
