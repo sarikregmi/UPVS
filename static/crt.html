@@ -1,9 +1,252 @@
+<style>
+	.wallet-box {
+		margin: 12px 0;
+		padding: 10px;
+		border: 1px solid #999;
+	}
+
+	.status-note {
+		font-size: 13px;
+		color: #333;
+	}
+
+	.generated-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 12px;
+		margin-top: 12px;
+	}
+
+	.label-card {
+		border: 1px solid #222;
+		padding: 10px;
+		background: #fff;
+	}
+
+	.label-card img {
+		width: 160px;
+		height: 160px;
+		object-fit: contain;
+		display: block;
+		margin: 8px auto;
+	}
+
+	@media print {
+		form,
+		h2,
+		table,
+		p,
+		.print-hide {
+			display: none !important;
+		}
+
+		#print-area {
+			display: block !important;
+		}
+
+		.label-card {
+			break-inside: avoid;
+			border: 1px solid #000;
+		}
+	}
+</style>
+
 <form action="/crt" method="post">
-<input type="text" name="data" placeholder="product details" value="">
+<div class="wallet-box">
+	<input type="hidden" name="sol_signature" id="sol_signature" value="{{ sol_signature or '' }}">
+	<p class="status-note" id="walletStatus">Wallet: not connected</p>
+	<p class="status-note" id="signatureStatus">Ready</p>
+	<p class="status-note">Create fee: {{ create_fee_sol }} SOL per QR to {{ platform_wallet }}</p>
+</div>
+<input type="text" name="data" placeholder="product details" value="{{ product_details or '' }}" required>
+<input type="number" name="quantity" min="1" max="100" value="{{ quantity or 1 }}" required>
 <textarea name="i_d" readonly>{{ i_d }}</textarea>
-<button type="submit" name="action" value="generate">Generate QR Code</button>
+<input type="hidden" name="action" value="generate">
+<button type="button" id="generateBtn">Generate QR Code</button>
+{% if error %}
+<p style="color:red;">{{ error }}</p>
+{% endif %}
 <br> <textarea readonly>{{ data }}</textarea>
 
 <img src="/{{ img_url }}?v={{ cache_bust }}" alt="my image">
 
 </form>
+
+{% if generated_qrs %}
+<h2 class="print-hide">Generated QR Results</h2>
+<button class="print-hide" type="button" onclick="window.print()">Print Labels</button>
+<div id="print-area" class="generated-grid">
+	{% for item in generated_qrs %}
+	<div class="label-card">
+		<h3>UID: {{ item.uid }}</h3>
+		<p><strong>Product:</strong> {{ item.product_details }}</p>
+		<p><strong>Verify:</strong> {{ item.verify_url }}</p>
+		<img src="/{{ item.image_url }}?v={{ cache_bust }}" alt="Generated QR">
+	</div>
+	{% endfor %}
+</div>
+{% endif %}
+
+<h2>Unsold QR List</h2>
+{% if unsold_codes %}
+<table border="1" cellpadding="6" cellspacing="0">
+	<tr>
+		<th>UID</th>
+		<th>Product</th>
+		<th>Data</th>
+		<th>Created</th>
+		<th>View</th>
+	</tr>
+	{% for uid, data, image_url, creation, product_details in unsold_codes %}
+	<tr>
+		<td>{{ uid }}</td>
+		<td>{{ product_details or '-' }}</td>
+		<td>{{ data }}</td>
+		<td>{{ creation }}</td>
+		<td><a href="/ver?q={{ uid }}">Open</a></td>
+	</tr>
+	{% endfor %}
+</table>
+{% else %}
+<p>No unsold QR codes yet.</p>
+{% endif %}
+
+<form action="/logout" method="post">
+	<button type="submit">Logout</button>
+</form>
+
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<script>
+	const generateBtn = document.getElementById("generateBtn");
+	const walletStatus = document.getElementById("walletStatus");
+	const signatureStatus = document.getElementById("signatureStatus");
+	const signatureInput = document.getElementById("sol_signature");
+	const crtForm = document.querySelector('form[action="/crt"]');
+	const quantityInput = document.querySelector('input[name="quantity"]');
+	const CREATE_FEE_SOL = Number("{{ create_fee_sol }}");
+	const PLATFORM_WALLET = "{{ platform_wallet }}";
+
+	let provider = null;
+
+	function isLocalHost() {
+		return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+	}
+
+	function getPhantomProvider() {
+		if (window.phantom && window.phantom.solana && window.phantom.solana.isPhantom) {
+			return window.phantom.solana;
+		}
+		if (window.solana && window.solana.isPhantom) {
+			return window.solana;
+		}
+		return null;
+	}
+
+	async function ensureWalletConnected() {
+		provider = getPhantomProvider();
+		if (!provider) {
+			throw new Error("Phantom wallet not found. Install Phantom extension.");
+		}
+
+		if (!provider.publicKey) {
+			try {
+				const response = await provider.connect({ onlyIfTrusted: false });
+				walletStatus.textContent = `Wallet: ${response.publicKey.toString()}`;
+			} catch (err) {
+				throw new Error(`Wallet connection rejected: ${err.message}`);
+			}
+		}
+
+		if (!provider.publicKey) {
+			throw new Error("Wallet not connected.");
+		}
+
+		return provider;
+	}
+
+	async function payCreateFee(quantity) {
+		if (typeof window.solanaWeb3 === "undefined") {
+			throw new Error("Solana Web3 failed to load. Refresh and try again.");
+		}
+
+		const totalLamports = Math.round(CREATE_FEE_SOL * quantity * solanaWeb3.LAMPORTS_PER_SOL);
+		console.log(`Charging ${quantity} QR(s) x ${CREATE_FEE_SOL} SOL = ${totalLamports} lamports`);
+
+		try {
+			signatureStatus.textContent = `Paying for ${quantity} QR(s)...`;
+			const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("devnet"), "confirmed");
+
+			const { blockhash } = await connection.getLatestBlockhash();
+
+			const toPubkey = new solanaWeb3.PublicKey(PLATFORM_WALLET);
+			const fromPubkey = provider.publicKey;
+
+			const tx = new solanaWeb3.Transaction().add(
+				solanaWeb3.SystemProgram.transfer({
+					fromPubkey,
+					toPubkey,
+					lamports: totalLamports,
+				})
+			);
+			tx.feePayer = fromPubkey;
+			tx.recentBlockhash = blockhash;
+
+			signatureStatus.textContent = "Wallet: confirm transaction...";
+			const signedTx = await provider.signTransaction(tx);
+
+			signatureStatus.textContent = "Sending payment...";
+			const signature = await connection.sendRawTransaction(signedTx.serialize());
+
+			signatureStatus.textContent = "Confirming...";
+			await connection.confirmTransaction(signature, "confirmed");
+
+			signatureInput.value = signature;
+			signatureStatus.textContent = `Paid: ${signature.substring(0, 20)}...`;
+			return signature;
+		} catch (error) {
+			console.error("Payment error:", error);
+			throw new Error(`Payment failed: ${error.message}`);
+		}
+	}
+
+	async function handleGenerateClick(event) {
+		event.preventDefault();
+
+		const quantity = parseInt(quantityInput.value || 1);
+
+		try {
+			signatureStatus.textContent = "Connecting wallet...";
+			await ensureWalletConnected();
+
+			await payCreateFee(quantity);
+
+			const actionInput = crtForm.querySelector('input[name="action"]');
+			if (actionInput) {
+				actionInput.value = "generate";
+			}
+			crtForm.submit();
+		} catch (error) {
+			signatureStatus.textContent = error.message;
+			console.error(error);
+		}
+	}
+
+	generateBtn.addEventListener("click", handleGenerateClick);
+
+	window.addEventListener("load", function() {
+		provider = getPhantomProvider();
+		if (provider && provider.publicKey) {
+			walletStatus.textContent = `Wallet: ${provider.publicKey.toString()}`;
+		}
+
+		if (provider) {
+			provider.on("connect", function(publicKey) {
+				walletStatus.textContent = `Wallet: ${publicKey.toString()}`;
+			});
+
+			provider.on("disconnect", function() {
+				walletStatus.textContent = "Wallet: disconnected";
+			});
+		}
+	});
+</script>

@@ -26,55 +26,200 @@ def create_table():
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS qr_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT, data TEXT, image_url TEXT,sold BOOLEAN,creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,username TEXT)"
+        "CREATE TABLE IF NOT EXISTS qr_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT, data TEXT, image_url TEXT,sold BOOLEAN,creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,username TEXT,product_details TEXT,sol_create_signature TEXT,sol_sold_signature TEXT)"
     )
+    columns = [row[1] for row in cursor.execute("PRAGMA table_info(qr_codes)").fetchall()]
+    if "product_details" not in columns:
+        cursor.execute("ALTER TABLE qr_codes ADD COLUMN product_details TEXT")
+    if "sol_create_signature" not in columns:
+        cursor.execute("ALTER TABLE qr_codes ADD COLUMN sol_create_signature TEXT")
+    if "sol_sold_signature" not in columns:
+        cursor.execute("ALTER TABLE qr_codes ADD COLUMN sol_sold_signature TEXT")
+
+    cursor.execute(
+        "CREATE TABLE IF NOT EXISTS qr_activity (id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT, action TEXT, actor TEXT, role TEXT, sol_signature TEXT, notes TEXT, creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+    # Remove malformed legacy rows and duplicate UIDs from old test data.
+    cursor.execute("DELETE FROM qr_codes WHERE uid IS NULL OR uid = '' OR data IS NULL OR data = ''")
+    cursor.execute("DELETE FROM qr_codes WHERE creation = 'test'")
+    cursor.execute("DELETE FROM qr_codes WHERE id NOT IN (SELECT MIN(id) FROM qr_codes GROUP BY uid)")
     db.commit()
 
 def create_login_table():
     db = get_login_db()
     cursor = db.cursor()
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT,role TEXT,sold BOOLEAN,creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+        "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT,role TEXT,creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
     )
+    # Migrate older databases that still have the deprecated sold column.
+    columns = [row[1] for row in cursor.execute("PRAGMA table_info(users)").fetchall()]
+    if "sold" in columns:
+        cursor.execute("ALTER TABLE users RENAME TO users_old")
+        cursor.execute(
+            "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT,role TEXT,creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+        )
+        cursor.execute(
+            "INSERT INTO users (id, username, password, role, creation) SELECT id, username, password, role, creation FROM users_old WHERE id IN (SELECT MIN(id) FROM users_old GROUP BY username)"
+        )
+        cursor.execute("DROP TABLE users_old")
+    cursor.execute("DELETE FROM users WHERE id NOT IN (SELECT MIN(id) FROM users GROUP BY username)")
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_unique ON users(username)")
     db.commit()
 #qr logic functions
-def insert_qr_code(creation, uid=None, data=None, image_url=None, sold=False, username=None,solcre=None,solsold=None):
+def insert_qr_code(creation=None, uid=None, data=None, image_url=None, sold=False, username=None, product_details=None, sol_create_signature=None, sol_sold_signature=None):
     db = get_db()
     cursor = db.cursor()
-    cursor.execute(     
-        "INSERT INTO qr_codes (uid, data, image_url, sold, creation, username) VALUES (?, ?, ?, ?, ?, ?)", (uid, data, image_url, sold, creation, username)
-    )
+    if creation:
+        cursor.execute(
+            "INSERT INTO qr_codes (uid, data, image_url, sold, creation, username, product_details, sol_create_signature, sol_sold_signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (uid, data, image_url, sold, creation, username, product_details, sol_create_signature, sol_sold_signature),
+        )
+    else:
+        cursor.execute(
+            "INSERT INTO qr_codes (uid, data, image_url, sold, username, product_details, sol_create_signature, sol_sold_signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (uid, data, image_url, sold, username, product_details, sol_create_signature, sol_sold_signature),
+        )
 
     db.commit()
 
 def get_qr_code(uid):
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT data, image_url FROM qr_codes WHERE uid = ?", (uid,))
+    cursor.execute(
+        "SELECT data, image_url, product_details, sold, sol_create_signature, sol_sold_signature FROM qr_codes WHERE uid = ?",
+        (uid,),
+    )
     result = cursor.fetchone()
     return result if result else None
 
-def mork_sold(uid):
+def mork_sold(uid, sol_signature=None):
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("UPDATE qr_codes SET sold = ? WHERE uid = ?", (True, uid))
+    if sol_signature:
+        cursor.execute(
+            "UPDATE qr_codes SET sold = ?, sol_sold_signature = ? WHERE uid = ?",
+            (True, sol_signature, uid),
+        )
+    else:
+        cursor.execute("UPDATE qr_codes SET sold = ? WHERE uid = ?", (True, uid))
     db.commit()
+
+
+def record_qr_activity(uid, action, actor=None, role=None, sol_signature=None, notes=None):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "INSERT INTO qr_activity (uid, action, actor, role, sol_signature, notes) VALUES (?, ?, ?, ?, ?, ?)",
+        (uid, action, actor, role, sol_signature, notes),
+    )
+    db.commit()
+
+
+def is_signature_used(sol_signature, action=None):
+    signature = (sol_signature or "").strip()
+    if not signature:
+        return False
+
+    db = get_db()
+    cursor = db.cursor()
+    if action:
+        cursor.execute(
+            "SELECT 1 FROM qr_activity WHERE sol_signature = ? AND action = ? LIMIT 1",
+            (signature, action),
+        )
+    else:
+        cursor.execute(
+            "SELECT 1 FROM qr_activity WHERE sol_signature = ? LIMIT 1",
+            (signature,),
+        )
+    return cursor.fetchone() is not None
+
+
+def get_qr_sol_entry(uid):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT sol_create_signature, sol_sold_signature FROM qr_codes WHERE uid = ?",
+        (uid,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+
+    create_sig, sold_sig = row
+    has_entry = bool(create_sig or sold_sig)
+    return {
+        "has_entry": has_entry,
+        "create_signature": create_sig,
+        "sold_signature": sold_sig,
+    }
+
+
+def get_qr_activity(uid):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT action, actor, role, sol_signature, creation FROM qr_activity WHERE uid = ? ORDER BY id DESC",
+        (uid,),
+    )
+    return cursor.fetchall()
+
+
+def purge_all_qr_data():
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM qr_activity")
+    cursor.execute("DELETE FROM qr_codes")
+    db.commit()
+
+
+def get_unsold_qr_codes(username=None):
+    db = get_db()
+    cursor = db.cursor()
+    if username:
+        cursor.execute(
+            "SELECT uid, data, image_url, creation, product_details FROM qr_codes WHERE (sold = 0 OR sold IS NULL) AND username = ? ORDER BY id DESC",
+            (username,),
+        )
+    else:
+        cursor.execute(
+            "SELECT uid, data, image_url, creation, product_details FROM qr_codes WHERE sold = 0 OR sold IS NULL ORDER BY id DESC"
+        )
+    return cursor.fetchall()
 
 
 # login database functions
 def insert_user(username, password, role='0'):
+    username = (username or "").strip()
+    if not username:
+        return False
+
     db = get_login_db()
     cursor = db.cursor()
     cursor.execute(
-        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (username, password, role)
+        "SELECT 1 FROM users WHERE lower(trim(username)) = lower(?)",
+        (username,),
     )
-    db.commit()
+    if cursor.fetchone():
+        return False
+
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (username, password, role)
+        )
+        db.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
   
 def verify_user(username, password,role='0'):
+    username = (username or "").strip()
+
     db = get_login_db()
     cursor = db.cursor()
     cursor.execute(
-        "SELECT password FROM users WHERE username = ? AND role = ?", (username, role)
+        "SELECT password FROM users WHERE lower(trim(username)) = lower(?) AND role = ?", (username, role)
     )
     result = cursor.fetchone()
     if not result:
