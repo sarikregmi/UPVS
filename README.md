@@ -37,9 +37,9 @@ web3project/
 |- templates/
 |- static/
 |- qr/
-|- submission/
-```
 
+
+```
 ## Quick Start
 
 1. Clone and open project
