@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Create QR{% endblock %}
+
+{% block content %}
+<div class="dash-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Manufacturer</div>
+            <a href="/crt" class="sidebar-item active"><span class="sidebar-icon">⊕</span> Generate QR</a>
+            <a href="/logout" class="sidebar-item"><span class="sidebar-icon">🚪</span> Logout</a>
+        </div>
+    </aside>
+
+    <main class="dash-main">
+        <div class="dash-header fade-up">
+            <div class="section-label">Manufacturer Dashboard</div>
+            <h2>Generate QR Codes</h2>
+            <p>Create blockchain-backed QR codes for your products.</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error fade-up"><span class="alert-icon">✖</span><span>{{ error }}</span></div>
+        {% endif %}
+
+        <div class="grid-2 fade-up delay-1" style="align-items:start;">
+            <div>
+                <div class="wallet-box">
+                    <div class="wallet-row"><span class="wallet-label">Platform Wallet</span><span class="wallet-value truncate" style="max-width:200px; font-size:.7rem;" title="{{ platform_wallet }}">{{ platform_wallet[:20] }}…{{ platform_wallet[-6:] }}</span></div>
+                    <div class="wallet-row mt-8"><span class="wallet-label">Creation Fee</span><span class="wallet-value">{{ create_fee_sol }} SOL <span style="color:var(--muted); font-size:.7rem;">per batch</span></span></div>
+                    <div class="wallet-row mt-8"><span class="wallet-label">Wallet</span><span class="wallet-value" id="walletStatus">Wallet: not connected</span></div>
+                    <div class="wallet-row mt-8"><span class="wallet-label">RPC</span><span class="wallet-value" id="rpcStatus" style="font-size:.68rem;">RPC: auto</span></div>
+                </div>
+
+                <div class="card">
+                    <h3 style="margin-bottom:20px;">New QR Batch</h3>
+                    <form method="POST" action="/crt" id="crtForm">
+                        <input type="hidden" name="action" value="generate">
+                        <div class="form-group">
+                            <label for="data">Product Details</label>
+                            <textarea id="data" name="data" placeholder="Product name, batch no., specs, serial range…" rows="4" required>{{ product_details }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="quantity">Quantity (1 – 100)</label>
+                            <input type="number" id="quantity" name="quantity" min="1" max="100" value="{{ quantity }}" placeholder="1">
+                            <p class="input-hint">Number of unique QR codes to generate in this batch.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="sol_signature">Solana Signature <span style="color:var(--muted); font-weight:400;">(optional)</span></label>
+                            <input type="text" id="sol_signature" name="sol_signature" placeholder="Paste transaction signature or pay below">
+                            <p class="input-hint">Attach your SOL transaction hash for on-chain proof.</p>
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-bottom:10px;" onclick="connectWallet(document.getElementById('walletStatus'))">Connect Wallet</button>
+                        <div id="payStatus" style="font-size:.72rem; color:var(--muted); text-align:center; margin-bottom:12px; min-height:16px;"></div>
+                        <button type="button" class="btn btn-sol" style="width:100%;justify-content:center;" onclick="payAndSubmitGenerate()">💳 Pay & Generate QR Codes</button>
+                    </form>
+                </div>
+            </div>
+
+            <div>
+                {% if generated_qrs %}
+                <div class="card mb-16">
+                    <div class="flex items-center justify-between mb-16">
+                        <h3 style="color:var(--green);">✔ {{ generated_qrs|length }} QR Code{{ 's' if generated_qrs|length > 1 }} Generated</h3>
+                        <span class="badge badge-verified">New</span>
+                    </div>
+                    <div class="qr-wrap mb-16"><img src="/{{ generated_qrs[0].image_url }}?{{ cache_bust }}" alt="QR Code" class="qr-img"></div>
+                    <div class="section-label mb-8">Verify URL</div>
+                    <div class="copy-wrap mb-16"><div class="copy-field">{{ generated_qrs[0].verify_url }}</div><button class="btn btn-ghost btn-sm" onclick="copyText('{{ generated_qrs[0].verify_url }}', this)">Copy</button></div>
+                    {% if generated_qrs|length > 1 %}
+                    <div class="section-label mb-8">All Generated ({{ generated_qrs|length }})</div>
+                    <div class="qr-list">
+                        {% for qr in generated_qrs %}
+                        <div class="qr-thumb">
+                            <img src="/{{ qr.image_url }}?{{ cache_bust }}" alt="QR {{ loop.index }}" loading="lazy">
+                            <div class="qr-thumb-detail">{{ qr.product_details[:30] if qr.product_details else '—' }}{% if qr.product_details and qr.product_details|length > 30 %}…{% endif %}</div>
+                            <div class="qr-thumb-uid">{{ qr.uid[:18] }}…</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="card" style="text-align:center; padding:40px 24px; border-style:dashed;">
+                    <div style="font-size:3rem; margin-bottom:12px; opacity:.3;">⊞</div>
+                    <p style="font-size:.82rem;">Generated QR codes will appear here.</p>
+                </div>
+                {% endif %}
+
+                {% if unsold_codes %}
+                <div class="card mt-16">
+                    <div class="flex items-center justify-between mb-16">
+                        <h3>Unsold Inventory</h3>
+                        <span class="badge badge-unsold">{{ unsold_codes|length }} items</span>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Product Details</th><th>Created</th><th>Action</th></tr></thead>
+                            <tbody>
+                                {% for uid, data, image_url, creation, product_details in unsold_codes %}
+                                <tr>
+                                    <td class="truncate" style="max-width:180px;" title="{{ product_details }}">{{ product_details[:40] if product_details else '—' }}{% if product_details and product_details|length > 40 %}…{% endif %}</td>
+                                    <td class="text-muted text-xs">{{ creation[:16] if creation else '—' }}</td>
+                                    <td><a href="/ver?q={{ uid }}" class="btn btn-ghost btn-sm">Verify</a></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function payAndSubmitGenerate() {
+    const statusEl = document.getElementById("payStatus");
+    statusEl.textContent = "Connecting wallet…";
+    statusEl.style.color = "var(--muted)";
+
+    const sig = await sendSolFee("{{ platform_wallet }}", {{ create_fee_sol }}, statusEl);
+    if (sig) {
+        document.getElementById("sol_signature").value = sig;
+        statusEl.textContent = "✓ Payment confirmed — generating QR codes…";
+        statusEl.style.color = "var(--green)";
+        document.getElementById("crtForm").submit();
+    }
+}
+</script>
+{% endblock %}

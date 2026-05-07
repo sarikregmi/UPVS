@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}UPVS — Blockchain Product Verification{% endblock %}
+
+{% block content %}
+<div class="container">
+  <section class="hero fade-up">
+    <span class="hero-eyebrow">🔗 Powered by Solana Blockchain</span>
+    <h1>Eliminate Counterfeits.<br>Verify with Confidence.</h1>
+    <p>UPVS links every product to a tamper-proof QR code backed by an immutable Solana transaction.</p>
+    <div class="hero-btns">
+      <a href="/login" class="btn btn-primary btn-lg">Get Started →</a>
+      <a href="#how" class="btn btn-ghost btn-lg">How It Works</a>
+    </div>
+  </section>
+
+  <section class="delay-1 fade-up">
+    <div class="section-label">Core Features</div>
+    <div class="feature-grid">
+      <div class="feature-card"><div class="feature-icon">🔐</div><h3>Blockchain Verified</h3><p>Every product is anchored to a Solana transaction signature.</p></div>
+      <div class="feature-card"><div class="feature-icon">📦</div><h3>Unique QR Tracking</h3><p>Batch-generate unique QR codes for each item.</p></div>
+      <div class="feature-card"><div class="feature-icon">🏭</div><h3>Manufacturer Dashboard</h3><p>Generate QR codes in bulk and monitor unsold inventory.</p></div>
+      <div class="feature-card"><div class="feature-icon">🛒</div><h3>Seller Validation</h3><p>Mark items sold with an auditable transaction proof.</p></div>
+    </div>
+  </section>
+
+  <div class="divider mt-32"></div>
+
+  <section id="how" class="delay-2 fade-up" style="padding:40px 0;">
+    <div class="section-label">Workflow</div>
+    <div class="grid-2" style="gap:32px; align-items:start;">
+      <div>
+        <h2 style="margin-bottom:20px;">How It Works</h2>
+        <ul class="steps-list">
+          <li>Manufacturer generates QR codes and pays a small SOL creation fee</li>
+          <li>Product data is stored and linked to the blockchain signature</li>
+          <li>Seller scans QR before sale and marks item sold on-chain</li>
+          <li>Customer scans QR at any time for instant verification</li>
+        </ul>
+      </div>
+      <div style="padding-top:8px;">
+        <div class="card" style="padding:24px;">
+          <div class="section-label mb-16">Platform Roles</div>
+          <div style="margin-bottom:14px;"><div class="flex items-center gap-8 mb-8"><span class="dot dot-amber"></span><span class="bold text-sm" style="color:var(--amber);">Manufacturer</span></div><p style="font-size:.78rem; margin-left:15px;">Create QR codes and attach product info.</p></div>
+          <div style="margin-bottom:14px;"><div class="flex items-center gap-8 mb-8"><span class="dot dot-green"></span><span class="bold text-sm" style="color:var(--green);">Seller</span></div><p style="font-size:.78rem; margin-left:15px;">Verify stock and mark items sold.</p></div>
+          <div><div class="flex items-center gap-8 mb-8"><span class="dot pulse" style="background:var(--sky);"></span><span class="bold text-sm" style="color:var(--sky);">Admin</span></div><p style="font-size:.78rem; margin-left:15px;">Provision manufacturer and seller accounts.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="cta-section delay-4 fade-up">
+    <div class="section-label" style="text-align:center;">Ready?</div>
+    <h2 style="margin-bottom:12px;">Start Securing Your Products Today</h2>
+    <p style="margin-bottom:28px;">Join the future of product authentication.</p>
+    <a href="/login" class="btn btn-sol btn-lg">Launch Dashboard →</a>
+  </section>
+</div>
+{% endblock %}

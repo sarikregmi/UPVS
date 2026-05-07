@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+
+{% block content %}
+<div class="dash-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Admin</div>
+      <a href="/admin" class="sidebar-item active"><span class="sidebar-icon">👤</span> Users</a>
+      <a href="/logout" class="sidebar-item"><span class="sidebar-icon">🚪</span> Logout</a>
+    </div>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-header fade-up">
+      <div class="section-label">Admin Panel</div>
+      <h2>User Management</h2>
+      <p>Provision manufacturer and seller accounts on the platform.</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error fade-up"><span class="alert-icon">✖</span><span>{{ error }}</span></div>
+    {% endif %}
+    {% if message %}
+    <div class="alert alert-success fade-up"><span class="alert-icon">✔</span><span>{{ message }}</span></div>
+    {% endif %}
+
+    <div class="grid-2 fade-up delay-1" style="align-items:start;">
+      <div class="card">
+        <h3 style="margin-bottom:20px;">Create New Account</h3>
+        <form method="POST" action="/admin">
+          <input type="hidden" name="action" value="create">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" placeholder="e.g. john_mfg" required autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" placeholder="Strong password" required autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="role">Role</label>
+            <select id="role" name="role" required>
+              <option value="" disabled selected>Select role</option>
+              <option value="mec">Manufacturer</option>
+              <option value="cem">Seller</option>
+              <option value="emc">Admin</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Create Account</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center justify-between mb-16">
+          <h3>Users</h3>
+          <span class="badge badge-verified">{{ users|length if users else 0 }}</span>
+        </div>
+        {% if users %}
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for username, role, created in users %}
+              <tr>
+                <td>{{ username }}</td>
+                <td>{{ role }}</td>
+                <td>{{ created }}</td>
+                <td>
+                  <form action="/admin" method="post" style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <input type="hidden" name="action" value="change_password">
+                    <input type="hidden" name="target_username" value="{{ username }}">
+                    <input type="password" name="new_password" placeholder="New password" required style="min-width:160px;">
+                    <button type="submit" class="btn btn-ghost btn-sm">Change</button>
+                  </form>
+                  <form action="/admin" method="post" onsubmit="return confirm('Delete user {{ username }}?');" style="margin-top:8px;">
+                    <input type="hidden" name="action" value="delete_user">
+                    <input type="hidden" name="target_username" value="{{ username }}">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p>No users found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

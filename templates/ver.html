@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="verify-page">
+    {% set is_found = finding == 'found' %}
+    {% set has_sol_entry = sol_entry and sol_entry.has_entry %}
+
+    <div class="verify-status">
+        <div class="verify-icon {{ 'verify-icon-ok' if is_found else 'verify-icon-fail' }}">
+            {{ '✓' if is_found else '!' }}
+        </div>
+        <h1>QR Verification Report</h1>
+        <p>
+            {% if is_found %}
+                Product record found. Review details, status, and on-chain signatures below.
+            {% else %}
+                No product record matched this UID. Treat this QR as suspicious.
+            {% endif %}
+        </p>
+        <div class="verify-badges">
+            <span class="badge {{ 'badge-verified' if is_found else 'badge-fake' }}">{{ finding }}</span>
+            <span class="badge {{ 'badge-sold' if sold else 'badge-unsold' }}">{{ 'sold' if sold else 'unsold' }}</span>
+            <span class="badge {{ 'badge-verified' if has_sol_entry else 'badge-fake' }}">{{ 'sol entry found' if has_sol_entry else 'no sol entry' }}</span>
+        </div>
+    </div>
+
+    {% if is_found %}
+    <div class="grid-2 mt-24">
+        <article class="card">
+            <div class="section-label">Product Identity</div>
+
+            <div class="verify-row">
+                <div class="verify-key">UID</div>
+                <div class="verify-val verify-break">{{ uid or '-' }}</div>
+            </div>
+
+            <div class="verify-row">
+                <div class="verify-key">Product Details</div>
+                <div class="verify-val">{{ product_details or '-' }}</div>
+            </div>
+
+            <div class="verify-row">
+                <div class="verify-key">Verification URL</div>
+                <div class="verify-val verify-break">{{ data or '-' }}</div>
+            </div>
+
+            <div class="copy-wrap mt-16">
+                <button type="button" class="btn btn-ghost btn-sm" onclick='copyText({{ (uid or "") | tojson }}, this)'>Copy UID</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick='copyText({{ (data or "") | tojson }}, this)'>Copy URL</button>
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="section-label">On-chain Signatures</div>
+
+            <div class="verify-sig-block">
+                <div class="verify-sig-label">Create Signature</div>
+                <div class="verify-sig-text">{{ (sol_entry.create_signature if sol_entry else None) or '-' }}</div>
+                {% if sol_entry and sol_entry.create_signature %}
+                <div class="copy-wrap mt-8">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick='copyText({{ sol_entry.create_signature | tojson }}, this)'>Copy</button>
+                    <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer" href="https://explorer.solana.com/tx/{{ sol_entry.create_signature }}?cluster={{ solana_explorer_cluster }}">Explorer</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="verify-sig-block mt-16">
+                <div class="verify-sig-label">Sold Signature</div>
+                <div class="verify-sig-text">{{ (sol_entry.sold_signature if sol_entry else None) or '-' }}</div>
+                {% if sol_entry and sol_entry.sold_signature %}
+                <div class="copy-wrap mt-8">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick='copyText({{ sol_entry.sold_signature | tojson }}, this)'>Copy</button>
+                    <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer" href="https://explorer.solana.com/tx/{{ sol_entry.sold_signature }}?cluster={{ solana_explorer_cluster }}">Explorer</a>
+                </div>
+                {% endif %}
+            </div>
+        </article>
+    </div>
+
+    <div class="grid-2 mt-24">
+        <article class="card">
+            <div class="section-label">QR Image</div>
+            <div class="qr-wrap">
+                <img class="qr-img verify-image" src="/{{ image_url }}" alt="QR code image for {{ uid or 'product' }}">
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="section-label">Recent Activity</div>
+            {% if activity %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Action</th>
+                            <th>Signature</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for action, actor, role, signature, creation in activity %}
+                        <tr>
+                            <td>{{ creation }}</td>
+                            <td><span class="activity-chip activity-chip-{{ action }}">{{ action }}</span></td>
+                            <td>{{ 'yes' if signature else 'no' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info mb-0">
+                <span class="alert-icon">i</span>
+                <div>No activity recorded for this UID yet.</div>
+            </div>
+            {% endif %}
+        </article>
+    </div>
+    {% else %}
+    <article class="card mt-24 verify-empty-card">
+        <div class="section-label">Not Found</div>
+        <h2 class="mb-8">This QR code is not in the registry</h2>
+        <p class="mb-16">It may be invalid, mistyped, or generated outside this system.</p>
+        <div class="copy-wrap">
+            <a href="/" class="btn btn-primary btn-sm">Back to Home</a>
+            <a href="/ver" class="btn btn-ghost btn-sm">Try another UID</a>
+        </div>
+    </article>
+    {% endif %}
+</section>
+{% endblock %}

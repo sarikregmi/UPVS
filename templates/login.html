@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — UPVS</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div style="position:fixed;top:-80px;left:25%;width:500px;height:280px;background:radial-gradient(ellipse,rgba(56,189,248,0.09) 0%,transparent 70%);pointer-events:none;z-index:0;"></div>
+<div style="position:fixed;bottom:-80px;right:20%;width:400px;height:250px;background:radial-gradient(ellipse,rgba(153,69,255,0.08) 0%,transparent 70%);pointer-events:none;z-index:0;"></div>
+
+<div class="login-page">
+  <div class="login-card fade-up">
+
+    <div class="login-logo">
+      <div class="brand">UPVS</div>
+      <p>Universal Product Verification System</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">
+      <span class="alert-icon">✖</span>
+      <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <div class="card card-glow">
+      <form method="POST" action="/login">
+
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" placeholder="Enter your username" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;">Login →</button>
+
+      </form>
+    </div>
+
+    <p style="text-align:center; margin-top:20px; font-size:.75rem;">Contact your admin if you don't have credentials.</p>
+
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Seller Dashboard{% endblock %}
+
+{% block content %}
+<div class="dash-layout">
+    <aside class="sidebar">
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Seller</div>
+            <a href="/seller" class="sidebar-item active"><span class="sidebar-icon">🛍️</span> Product Verify</a>
+            <a href="/logout" class="sidebar-item"><span class="sidebar-icon">🚪</span> Logout</a>
+        </div>
+    </aside>
+
+    <main class="dash-main">
+        <div class="dash-header fade-up">
+            <div class="section-label">Seller Dashboard</div>
+            <h2>Product Verification</h2>
+            <p>Scan a QR code or enter a product UID to verify and mark as sold.</p>
+        </div>
+
+        <div class="wallet-box fade-up delay-1" style="margin-top:-4px; margin-bottom:18px;">
+            <div class="wallet-row"><span class="wallet-label">Wallet</span><span class="wallet-value" id="walletStatus">Wallet: not connected</span></div>
+            <div class="wallet-row mt-8"><span class="wallet-label">Supported</span><span class="wallet-value" style="font-size:.72rem;">Phantom / Solflare / Backpack</span></div>
+            <div class="wallet-row mt-8"><span class="wallet-label">RPC</span><span class="wallet-value" id="rpcStatus" style="font-size:.68rem;">RPC: auto</span></div>
+        </div>
+
+        {% if seller_error %}
+        <div class="alert alert-error fade-up"><span class="alert-icon">✖</span><span>{{ seller_error }}</span></div>
+        {% endif %}
+
+        <div class="card mb-24 fade-up delay-1">
+            <h3 style="margin-bottom:16px;">Look Up Product</h3>
+            <form method="GET" action="/seller" style="display:flex; gap:10px; flex-wrap:wrap;">
+                <input type="text" name="q" placeholder="Paste product UID or scan QR code…" value="{{ q or '' }}" style="flex:1; min-width:220px;" autocomplete="off">
+                <button type="submit" class="btn btn-primary">Search →</button>
+            </form>
+        </div>
+
+        {% if q %}
+        {% if data %}
+        <div class="grid-2 fade-up delay-2" style="align-items:start;">
+            <div>
+                <div class="card">
+                    {% if sold %}
+                    <div class="alert alert-success" style="margin-bottom:20px;"><span class="alert-icon">✔</span><span><strong>Already Sold</strong> — This product has been marked as sold.</span></div>
+                    {% else %}
+                    <div class="alert alert-warn" style="margin-bottom:20px;"><span class="alert-icon">⚠</span><span><strong>Unsold</strong> — This product is available and authentic.</span></div>
+                    {% endif %}
+
+                    <div class="qr-wrap mb-16"><img src="/{{ image_url }}" alt="Product QR" class="qr-img"></div>
+
+                    <div class="section-label mb-8">Product Details</div>
+                    <p style="font-size:.85rem; color:var(--text); line-height:1.7; margin-bottom:16px;">{{ product_details or '— No details provided —' }}</p>
+
+                    <div class="section-label mb-8">Product UID</div>
+                    <div class="copy-wrap mb-16">
+                        <div class="copy-field">{{ q }}</div>
+                        <button class="btn btn-ghost btn-sm" onclick="copyText('{{ q }}', this)">Copy</button>
+                    </div>
+
+                    {% if sol_entry and sol_entry.has_entry %}
+                    <div class="section-label mb-8">Blockchain Record</div>
+                    <div class="chain-card mb-16">
+                        {% if sol_entry.create_signature %}
+                        <div class="chain-row"><span class="chain-key">Create Tx</span><span class="chain-val" style="font-size:.66rem;">{{ sol_entry.create_signature[:28] }}…</span></div>
+                        {% endif %}
+                        {% if sol_entry.sold_signature %}
+                        <div class="chain-row"><span class="chain-key">Sold Tx</span><span class="chain-val" style="font-size:.66rem;">{{ sol_entry.sold_signature[:28] }}…</span></div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if not sold %}
+                    <div class="divider"></div>
+                    <div class="section-label mb-8" style="color:var(--green);">Mark as Sold</div>
+                    <div class="wallet-box" style="margin-bottom:14px;">
+                        <div class="wallet-row"><span class="wallet-label">Platform Wallet</span><span class="wallet-value" style="font-size:.68rem;">{{ platform_wallet[:18] }}…</span></div>
+                        <div class="wallet-row mt-8"><span class="wallet-label">Sale Fee</span><span class="wallet-value">{{ sold_fee_sol }} SOL</span></div>
+                    </div>
+                    <form method="POST" action="/seller?q={{ q }}" id="sellerForm">
+                        <div class="form-group">
+                            <label for="sol_signature">Solana Signature <span style="color:var(--muted); font-weight:400;">(optional)</span></label>
+                            <input type="text" id="sol_signature" name="sol_signature" placeholder="Paste tx hash or pay with Phantom below">
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-bottom:10px;" onclick="connectWallet(document.getElementById('walletStatus'))">Connect Wallet</button>
+                        <div id="payStatus" style="font-size:.72rem; color:var(--muted); text-align:center; margin-bottom:12px; min-height:16px;"></div>
+                        <button type="button" class="btn btn-green" style="width:100%;justify-content:center;" onclick="payAndSubmitSold()">💳 Pay & Mark as Sold</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="card">
+                    <div class="flex items-center justify-between mb-16">
+                        <h3>Activity Log</h3>
+                        {% if activity %}<span class="badge badge-verified">{{ activity|length }} events</span>{% endif %}
+                    </div>
+                    {% if activity %}
+                        {% for action, actor, role, sol_sig, ts in activity %}
+                        <div class="activity-item">
+                            <div class="activity-icon {% if action == 'create' %}activity-icon-create{% elif action == 'sold' %}activity-icon-sold{% else %}activity-icon-verify{% endif %}">{% if action == 'create' %}⊕{% elif action == 'sold' %}✔{% else %}🔍{% endif %}</div>
+                            <div class="activity-meta">
+                                <div class="activity-action">{% if action == 'create' %}Created{% elif action == 'sold' %}Marked Sold{% else %}Verified{% endif %}</div>
+                                <div class="activity-detail">by <strong>{{ actor or 'Unknown' }}</strong>{% if role %} · {{ role }}{% endif %}{% if sol_sig %} · <span class="text-sol" style="font-size:.68rem;" title="{{ sol_sig }}">🔗 {{ sol_sig[:14] }}…</span>{% endif %}</div>
+                            </div>
+                            <div class="activity-time">{{ ts[:16] if ts else '—' }}</div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p style="text-align:center; padding:20px 0; font-size:.82rem;">No activity recorded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card fade-up delay-2" style="text-align:center; padding:48px 24px;">
+            <div style="font-size:3rem; margin-bottom:14px;">❌</div>
+            <h3 style="color:var(--red); margin-bottom:8px;">Product Not Found</h3>
+            <p style="font-size:.85rem;">No product matches UID: <span style="color:var(--text);">{{ q }}</span></p>
+            <p style="font-size:.78rem; margin-top:8px;">The QR code may be counterfeit or the UID is incorrect.</p>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="card fade-up delay-2" style="text-align:center; padding:60px 24px; border-style:dashed;">
+            <div style="font-size:3rem; margin-bottom:14px; opacity:.3;">🔍</div>
+            <p style="font-size:.88rem;">Enter a product UID above to verify authenticity.</p>
+        </div>
+        {% endif %}
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function payAndSubmitSold() {
+    const statusEl = document.getElementById("payStatus");
+    statusEl.textContent = "Connecting wallet…";
+    statusEl.style.color = "var(--muted)";
+
+    const sig = await sendSolFee("{{ platform_wallet }}", {{ sold_fee_sol }}, statusEl);
+    if (sig) {
+        document.getElementById("sol_signature").value = sig;
+        statusEl.textContent = "✓ Payment confirmed — marking sold…";
+        statusEl.style.color = "var(--green)";
+        document.getElementById("sellerForm").submit();
+    }
+}
+</script>
+{% endblock %}

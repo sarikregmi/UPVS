@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}UPVS{% endblock %} — Product Verification</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/" class="navbar-brand">UPV<span>S</span></a>
+  <div class="navbar-links">
+    {% if session.get('role') == 'mec' %}
+      <span class="navbar-badge">Manufacturer</span>
+      <a href="/crt" class="btn btn-ghost btn-sm">Dashboard</a>
+    {% elif session.get('role') == 'cem' %}
+      <span class="navbar-badge">Seller</span>
+      <a href="/seller" class="btn btn-ghost btn-sm">Dashboard</a>
+    {% elif session.get('role') == 'emc' %}
+      <span class="navbar-badge">Admin</span>
+      <a href="/admin" class="btn btn-ghost btn-sm">Dashboard</a>
+    {% endif %}
+
+    {% if session.get('user') %}
+      <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+    {% else %}
+      <a href="/login" class="btn btn-primary btn-sm">Login</a>
+    {% endif %}
+  </div>
+</nav>
+
+{% block content %}{% endblock %}
+
+<script>
+  window.APP_CONFIG = {
+    rpcEndpoints: {{ rpc_endpoints | tojson }}
+  };
+</script>
+<script src="/static/js/app.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

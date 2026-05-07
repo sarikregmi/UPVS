@@ -236,6 +236,35 @@ def get_user_cookie():
     role = session.get('role')
     return user, role      
 
+
+def get_all_users():
+    db = get_login_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT username, role, creation FROM users ORDER BY id ASC")
+    return cursor.fetchall()
+
+
+def update_user_password(username, new_hashed_password):
+    username = (username or "").strip()
+    if not username:
+        return False
+    db = get_login_db()
+    cursor = db.cursor()
+    cursor.execute("UPDATE users SET password = ? WHERE lower(trim(username)) = lower(?)", (new_hashed_password, username))
+    db.commit()
+    return cursor.rowcount > 0
+
+
+def delete_user(username):
+    username = (username or "").strip()
+    if not username:
+        return False
+    db = get_login_db()
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM users WHERE lower(trim(username)) = lower(?)", (username,))
+    db.commit()
+    return cursor.rowcount > 0
+
 #close database connection when app context is torn down
 
 def close_connection(exception):

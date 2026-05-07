@@ -12,6 +12,9 @@ from database import (
     get_unsold_qr_codes,
     get_user_cookie,
     insert_user,
+        get_all_users,
+        update_user_password,
+        delete_user,
     mork_sold,
     purge_all_qr_data,
     record_qr_activity,
@@ -33,11 +36,55 @@ def get_public_base_url():
     return host_url
 
 
+def get_rpc_endpoints():
+    configured = (os.environ.get("SOLANA_RPC_URL") or "").strip()
+    fallbacks = [
+        value.strip()
+        for value in (os.environ.get("SOLANA_RPC_FALLBACKS") or "").split(",")
+        if value.strip()
+    ]
+
+    defaults = [
+        "https://api.devnet.solana.com",
+        "https://solana-api.projectserum.com",
+        "https://rpc.ankr.com/solana",
+        "https://api.mainnet-beta.solana.com",
+    ]
+
+    endpoints = []
+    if configured:
+        endpoints.append(configured)
+    endpoints.extend(fallbacks)
+    endpoints.extend(defaults)
+
+    unique_endpoints = []
+    for endpoint in endpoints:
+        if endpoint not in unique_endpoints:
+            unique_endpoints.append(endpoint)
+    return unique_endpoints
+
+
+def get_solana_explorer_cluster():
+    primary_endpoint = (get_rpc_endpoints()[0] if get_rpc_endpoints() else "").lower()
+    if "devnet" in primary_endpoint:
+        return "devnet"
+    if "testnet" in primary_endpoint:
+        return "testnet"
+    return "mainnet-beta"
+
+
 def create_app(img_url="qr/temp.png"):
 
     initial_img_url = img_url
 
-    app = Flask(__name__, template_folder="static")
+    app = Flask(__name__, template_folder="templates", static_folder="static")
+
+    @app.context_processor
+    def inject_app_config():
+        return {
+            "rpc_endpoints": get_rpc_endpoints(),
+            "solana_explorer_cluster": get_solana_explorer_cluster(),
+        }
 
     @app.route("/qr/<path:filename>")
     def qr_image(filename):
@@ -137,6 +184,7 @@ def create_app(img_url="qr/temp.png"):
         result = get_qr_code(qr_value)
         sol_entry = get_qr_sol_entry(qr_value) if qr_value else None
         activity = get_qr_activity(qr_value) if qr_value else []
+        visible_activity = [row for row in activity if row[0] != "verify"]
 
         if result:
             finding='found'
@@ -157,7 +205,7 @@ def create_app(img_url="qr/temp.png"):
                 finding=finding,
                 sold=sold,
                 sol_entry=sol_entry,
-                activity=activity,
+                activity=visible_activity,
                 uid=qr_value,
             )
         finding='not found'
@@ -172,7 +220,7 @@ def create_app(img_url="qr/temp.png"):
             finding=finding,
             sold=False,
             sol_entry=sol_entry,
-            activity=activity,
+            activity=visible_activity,
             uid=qr_value,
         )
 
@@ -209,29 +257,62 @@ def create_app(img_url="qr/temp.png"):
     def user_maker():
         if get_user_cookie()[1] != 'emc':
             return redirect("/login")
-
+        # show users and forms
         if request.method == "GET":
-            return render_template("admin.html")
+            users = get_all_users()
+            return render_template("admin.html", users=users)
 
-        username = (request.form.get("username") or "").strip()
-        password = request.form.get("password") or ""
-        if request.form.get("role") == 'emc':
-            role = 'admin'
-        elif request.form.get("role") == 'mec':
-            role = 'mf'
-        elif request.form.get("role") == 'cem':
-            role = 'seller'
-        else:
-            role = '0'
+        action = (request.form.get("action") or "create").strip()
 
-        if not username or not password:
-            return render_template("admin.html", error="Username and password are required")
+        if action == "create":
+            username = (request.form.get("username") or "").strip()
+            password = request.form.get("password") or ""
+            if request.form.get("role") == 'emc':
+                role = 'admin'
+            elif request.form.get("role") == 'mec':
+                role = 'mf'
+            elif request.form.get("role") == 'cem':
+                role = 'seller'
+            else:
+                role = '0'
 
-        hashed_password = werkzeug.security.generate_password_hash(password)
-        created = insert_user(username, hashed_password, role)
-        if not created:
-            return render_template("admin.html", error="Username already exists")
-        return render_template("admin.html")
+            if not username or not password:
+                users = get_all_users()
+                return render_template("admin.html", users=users, error="Username and password are required")
+
+            hashed_password = werkzeug.security.generate_password_hash(password)
+            created = insert_user(username, hashed_password, role)
+            users = get_all_users()
+            if not created:
+                return render_template("admin.html", users=users, error="Username already exists")
+            return render_template("admin.html", users=users, message="User created")
+
+        if action == "change_password":
+            target = (request.form.get("target_username") or "").strip()
+            new_password = request.form.get("new_password") or ""
+            if not target or not new_password:
+                users = get_all_users()
+                return render_template("admin.html", users=users, error="Username and new password are required")
+            hashed = werkzeug.security.generate_password_hash(new_password)
+            ok = update_user_password(target, hashed)
+            users = get_all_users()
+            if not ok:
+                return render_template("admin.html", users=users, error="Failed to update password")
+            return render_template("admin.html", users=users, message=f"Password updated for {target}")
+
+        if action == "delete_user":
+            target = (request.form.get("target_username") or "").strip()
+            if not target:
+                users = get_all_users()
+                return render_template("admin.html", users=users, error="Username required to delete")
+            ok = delete_user(target)
+            users = get_all_users()
+            if not ok:
+                return render_template("admin.html", users=users, error="Failed to delete user (not found)")
+            return render_template("admin.html", users=users, message=f"Deleted user {target}")
+
+        users = get_all_users()
+        return render_template("admin.html", users=users)
     @app.route("/logout", methods=["GET", "POST"])
     def logout():
         close_cookie(None)
