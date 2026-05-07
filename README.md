@@ -85,6 +85,7 @@ python app.py
 
 - Admin Username: `emc`
 - Admin Password: `emc`
+- this is default password and username name for testing.
 
 Use admin account to create manufacturer and seller users before demo.
 
@@ -103,13 +104,7 @@ $env:SOLANA_RPC_FALLBACKS="https://api.devnet.solana.com,https://rpc.ankr.com/so
 python app.py
 ```
 
-## Demo and Submission Assets
 
-Prepared materials are in [submission/HACKATHON_SUBMISSION.md](submission/HACKATHON_SUBMISSION.md).
-
-- Deck: [submission/UPVS_Project_Deck.pptx](submission/UPVS_Project_Deck.pptx)
-- Pitch script: [submission/PITCH_SCRIPT.md](submission/PITCH_SCRIPT.md)
-- Demo shot list: [submission/DEMO_SHOTLIST.md](submission/DEMO_SHOTLIST.md)
 
 ## Important Repo Context
 
