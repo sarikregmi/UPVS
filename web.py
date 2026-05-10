@@ -202,9 +202,6 @@ def create_app(img_url="qr/temp.png"):
     @app.route("/ver")
     def verify_qr():
         actor, role = get_user_cookie()
-        if not actor:
-            return redirect("/login")
-
         qr_value = request.args.get("q")
         if role == 'cem':
             if qr_value:
@@ -220,7 +217,7 @@ def create_app(img_url="qr/temp.png"):
         if result:
             finding='found'
             data, image_url, product_details, sold, sol_create_signature, sol_sold_signature = result
-            if qr_value:
+            if qr_value and actor:
                 record_qr_activity(
                     qr_value,
                     "verify",
