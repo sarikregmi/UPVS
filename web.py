@@ -5,6 +5,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.utils import secure_filename
 import os
 import time
+import re
 import uuid
 import werkzeug
 from int import generate_qr
@@ -26,9 +27,22 @@ from database import (
     verify_user,
 )
 
-PLATFORM_WALLET = "BiGkF9DSBtYQhkeFMbe5xfkLPz2v9xvPYhVghiX9YtpT"
+PLATFORM_WALLET = os.environ.get("PLATFORM_WALLET", "BiGkF9DSBtYQhkeFMbe5xfkLPz2v9xvPYhVghiX9YtpT")
 CREATE_FEE_SOL = 0.05
 SOLD_FEE_SOL = 0.01
+
+
+def validate_password_strength(password):
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters"
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain uppercase letter"
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain lowercase letter"
+    if not re.search(r'[0-9]', password):
+        return False, "Password must contain digit"
+    return True, "OK"
+
 
 
 def get_public_base_url():
@@ -50,8 +64,8 @@ def get_rpc_endpoints():
 
     defaults = [
         "https://api.devnet.solana.com",
-        "https://solana-api.projectserum.com",
-        "https://rpc.ankr.com/solana",
+        "https://solana-devnet.g.alchemy.com/v2/demo",
+        "https://rpc.ankr.com/solana_devnet",
         "https://api.mainnet-beta.solana.com",
     ]
 
@@ -187,15 +201,17 @@ def create_app(img_url="qr/temp.png"):
     @csrf.exempt
     @app.route("/ver")
     def verify_qr():
+        actor, role = get_user_cookie()
+        if not actor:
+            return redirect("/login")
+
         qr_value = request.args.get("q")
-        if get_user_cookie()[1] == 'cem':
+        if role == 'cem':
             if qr_value:
                 return redirect(f"/seller?q={qr_value}")
             return redirect("/seller")
 
         role_map = {"mec": "mf", "cem": "seller", "emc": "admin"}
-        actor, role = get_user_cookie()
-
         result = get_qr_code(qr_value)
         sol_entry = get_qr_sol_entry(qr_value) if qr_value else None
         activity = get_qr_activity(qr_value) if qr_value else []
@@ -253,26 +269,29 @@ def create_app(img_url="qr/temp.png"):
             username = (request.form.get("username") or "").strip()
             password = (request.form.get("password") or "")
             if verify_user(username, password, role='0'):
-                user_cookie_store(username, 'mec')
+                if not user_cookie_store(username, 'mec'):
+                    return render_template("login.html", error="Invalid role")
                 return redirect("/crt")
             elif verify_user(username, password, role='mf'):
-                user_cookie_store(username, 'mec')
+                if not user_cookie_store(username, 'mec'):
+                    return render_template("login.html", error="Invalid role")
                 return redirect("/crt")
             elif verify_user(username, password, role='admin'):
-                user_cookie_store(username, 'emc')  
+                if not user_cookie_store(username, 'emc'):
+                    return render_template("login.html", error="Invalid role")
                 return redirect("/admin")
             elif verify_user(username, password, role='seller'):
-                user_cookie_store(username, 'cem')
+                if not user_cookie_store(username, 'cem'):
+                    return render_template("login.html", error="Invalid role")
                 return redirect("/seller")
             else:
                 return render_template("login.html", error="Invalid credentials")
-            
+
         return render_template("login.html")
     @app.route("/admin", methods=["GET", "POST"])
     def user_maker():
         if get_user_cookie()[1] != 'emc':
             return redirect("/login")
-        # show users and forms
         if request.method == "GET":
             users = get_all_users()
             return render_template("admin.html", users=users)
@@ -292,6 +311,11 @@ def create_app(img_url="qr/temp.png"):
                 users = get_all_users()
                 return render_template("admin.html", users=users, error="Username and password are required")
 
+            is_valid, msg = validate_password_strength(password)
+            if not is_valid:
+                users = get_all_users()
+                return render_template("admin.html", users=users, error=msg)
+
             hashed_password = werkzeug.security.generate_password_hash(password)
             created = insert_user(username, hashed_password, role)
             users = get_all_users()
@@ -305,6 +329,12 @@ def create_app(img_url="qr/temp.png"):
             if not target or not new_password:
                 users = get_all_users()
                 return render_template("admin.html", users=users, error="Username and new password are required")
+
+            is_valid, msg = validate_password_strength(new_password)
+            if not is_valid:
+                users = get_all_users()
+                return render_template("admin.html", users=users, error=msg)
+
             hashed = werkzeug.security.generate_password_hash(new_password)
             ok = update_user_password(target, hashed)
             users = get_all_users()
@@ -325,7 +355,6 @@ def create_app(img_url="qr/temp.png"):
 
         users = get_all_users()
         return render_template("admin.html", users=users)
-    @csrf.exempt
     @app.route("/logout", methods=["GET", "POST"])
     def logout():
         close_cookie(None)
@@ -396,11 +425,12 @@ def create_app(img_url="qr/temp.png"):
         )
 
     @app.route("/api/sol-entry", methods=["POST"])
+    @limiter.limit("30 per minute")
     def record_sol_entry():
         actor, role = get_user_cookie()
         if not actor:
             return jsonify({"error": "Unauthorized"}), 401
-        
+
         uid = (request.json or {}).get("uid") if request.is_json else request.form.get("uid")
         action = (request.json or {}).get("action") if request.is_json else request.form.get("action")
         signature = (request.json or {}).get("signature") if request.is_json else request.form.get("signature")

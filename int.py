@@ -3,12 +3,10 @@ import uuid
 import os
 from werkzeug.utils import secure_filename
 from database import insert_qr_code
-#cheak if qr folder exist if not create it
+
 check= os.listdir(".")
 if "qr" not in check:
     os.mkdir("qr")
-# spicial id for each qr code
-
 
 def _normalize_base_url(base_url):
     value = (base_url or "").strip()
@@ -16,7 +14,6 @@ def _normalize_base_url(base_url):
         return None
     return value.rstrip("/")
 
-# This function generates a QR code from the provided data and saves it as an image file.
 def generate_qr(i_d, filename=None, username=None, product_details=None, sol_create_signature=None, base_url=None):
     uid='ui' + str(uuid.uuid4())
     normalized_base_url = _normalize_base_url(base_url)
@@ -26,6 +23,9 @@ def generate_qr(i_d, filename=None, username=None, product_details=None, sol_cre
     if not filename:
         filename = f"{i_d}qr.png"
     filename = secure_filename(filename)
+    if not filename or '/' in filename or '\\' in filename or '..' in filename:
+        filename = f"{uuid.uuid4()}.png"
+
     qr = qrcode.QRCode(
         version=2,
         error_correction=qrcode.constants.ERROR_CORRECT_L,

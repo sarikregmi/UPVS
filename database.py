@@ -213,7 +213,7 @@ def insert_user(username, password, role='0'):
     except sqlite3.IntegrityError:
         return False
   
-def verify_user(username, password,role='0'):
+def verify_user(username, password, role='0'):
     username = (username or "").strip()
 
     db = get_login_db()
@@ -226,11 +226,14 @@ def verify_user(username, password,role='0'):
         return False
 
     stored_password = result[0]
-    return stored_password == password or werkzeug.security.check_password_hash(stored_password, password)
+    return werkzeug.security.check_password_hash(stored_password, password)
 #function to store user cookie in session
-def user_cookie_store(username, cook):
-                session['user'] = username
-                session['role'] = cook
+def user_cookie_store(username, role):
+    if role not in {'emc', 'mec', 'cem', '0'}:
+        return False
+    session['user'] = username
+    session['role'] = role
+    return True
 def get_user_cookie():
     user = session.get('user')
     role = session.get('role')
