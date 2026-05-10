@@ -38,9 +38,9 @@ web3project/
 |- templates/
 |- static/
 |- qr/
-|- submission/
-```
 
+
+```
 ## Quick Start
 
 1. Clone and open project
@@ -88,6 +88,7 @@ python app.py
 
 - Admin Username: `emc`
 - Admin Password: `emc`
+- this is default password and username name for testing.
 
 Use admin account to create manufacturer and seller users before demo.
 
@@ -110,16 +111,9 @@ python app.py
 
 - Use HTTPS in production so wallet connectivity and secure cookies work correctly.
 - Set `PUBLIC_BASE_URL` to the public domain that will appear inside generated QR codes.
-- Keep `submission/` for pitch/deck assets; it is not required for runtime deployment.
 - Copy `.env.example` to a local `.env` file when configuring secrets and RPC settings.
 
-## Demo and Submission Assets
 
-Prepared materials are in [submission/HACKATHON_SUBMISSION.md](submission/HACKATHON_SUBMISSION.md).
-
-- Deck: [submission/UPVS_Project_Deck.pptx](submission/UPVS_Project_Deck.pptx)
-- Pitch script: [submission/PITCH_SCRIPT.md](submission/PITCH_SCRIPT.md)
-- Demo shot list: [submission/DEMO_SHOTLIST.md](submission/DEMO_SHOTLIST.md)
 
 ## Important Repo Context
 
