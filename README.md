@@ -1,4 +1,4 @@
-# UPVS - Universal Product Verification System
+﻿# UPVS - Universal Product Verification System
 
 UPVS is a role-based web application for product authenticity verification.
 It combines QR identity, lifecycle tracking, and Solana-backed signatures to reduce counterfeit risk.
@@ -33,7 +33,8 @@ web3project/
 |- web.py
 |- database.py
 |- int.py
-|- requirment.txt
+|- requirements.txt
+|- .env.example
 |- templates/
 |- static/
 |- qr/
@@ -68,8 +69,10 @@ source .venv/bin/activate
 3. Install dependencies
 
 ```bash
-pip install -r requirment.txt
+pip install -r requirements.txt
 ```
+
+This repository also keeps `requirment.txt` for legacy compatibility, but `requirements.txt` is the canonical file.
 
 4. Run app
 
@@ -103,6 +106,13 @@ $env:SOLANA_RPC_FALLBACKS="https://api.devnet.solana.com,https://rpc.ankr.com/so
 python app.py
 ```
 
+## Deployment Notes
+
+- Use HTTPS in production so wallet connectivity and secure cookies work correctly.
+- Set `PUBLIC_BASE_URL` to the public domain that will appear inside generated QR codes.
+- Keep `submission/` for pitch/deck assets; it is not required for runtime deployment.
+- Copy `.env.example` to a local `.env` file when configuring secrets and RPC settings.
+
 ## Demo and Submission Assets
 
 Prepared materials are in [submission/HACKATHON_SUBMISSION.md](submission/HACKATHON_SUBMISSION.md).
@@ -116,3 +126,4 @@ Prepared materials are in [submission/HACKATHON_SUBMISSION.md](submission/HACKAT
 This repository is an MVP implementation of the core UPVS web product.
 It does not include a native mobile app or enterprise ERP integrations.
 Blockchain use is focused on payment/signature proofs and can be expanded further in production.
+

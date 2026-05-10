@@ -1,6 +1,7 @@
 import qrcode
 import uuid
 import os
+from werkzeug.utils import secure_filename
 from database import insert_qr_code
 #cheak if qr folder exist if not create it
 check= os.listdir(".")
@@ -24,6 +25,7 @@ def generate_qr(i_d, filename=None, username=None, product_details=None, sol_cre
     data= f"{normalized_base_url}/ver?q={uid}"
     if not filename:
         filename = f"{i_d}qr.png"
+    filename = secure_filename(filename)
     qr = qrcode.QRCode(
         version=2,
         error_correction=qrcode.constants.ERROR_CORRECT_L,

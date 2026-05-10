@@ -35,6 +35,7 @@
                 <div class="card">
                     <h3 style="margin-bottom:20px;">New QR Batch</h3>
                     <form method="POST" action="/crt" id="crtForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="action" value="generate">
                         <div class="form-group">
                             <label for="data">Product Details</label>

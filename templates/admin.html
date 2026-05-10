@@ -29,6 +29,7 @@
       <div class="card">
         <h3 style="margin-bottom:20px;">Create New Account</h3>
         <form method="POST" action="/admin">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="action" value="create">
           <div class="form-group">
             <label for="username">Username</label>
@@ -68,12 +69,14 @@
                 <td>{{ created }}</td>
                 <td>
                   <form action="/admin" method="post" style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="action" value="change_password">
                     <input type="hidden" name="target_username" value="{{ username }}">
                     <input type="password" name="new_password" placeholder="New password" required style="min-width:160px;">
                     <button type="submit" class="btn btn-ghost btn-sm">Change</button>
                   </form>
                   <form action="/admin" method="post" onsubmit="return confirm('Delete user {{ username }}?');" style="margin-top:8px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="action" value="delete_user">
                     <input type="hidden" name="target_username" value="{{ username }}">
                     <button type="submit" class="btn btn-danger btn-sm">Delete</button>

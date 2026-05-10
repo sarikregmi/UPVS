@@ -1,4 +1,8 @@
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.utils import secure_filename
 import os
 import time
 import uuid
@@ -73,11 +77,16 @@ def get_solana_explorer_cluster():
     return "mainnet-beta"
 
 
+ALLOWED_ROLES = {'admin', 'mf', 'seller', '0'}
+ALLOWED_ROLES_MAPPING = {'emc': 'admin', 'mec': 'mf', 'cem': 'seller'}
+
 def create_app(img_url="qr/temp.png"):
 
     initial_img_url = img_url
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
+    limiter = Limiter(app=app, key_func=get_remote_address)
+    csrf = CSRFProtect(app)
 
     @app.context_processor
     def inject_app_config():
@@ -86,11 +95,16 @@ def create_app(img_url="qr/temp.png"):
             "solana_explorer_cluster": get_solana_explorer_cluster(),
         }
 
-    @app.route("/qr/<path:filename>")
+    @app.route("/qr/<filename>")
+    @csrf.exempt
     def qr_image(filename):
-        return send_from_directory("qr", filename)
+        safe_filename = secure_filename(filename)
+        if not safe_filename or safe_filename != filename:
+            return "Invalid filename", 400
+        return send_from_directory("qr", safe_filename)
 
     @app.route("/")
+    @csrf.exempt
     def hello_world():
         return render_template("index.html")
     @app.route("/crt", methods=["GET", "POST"])
@@ -170,6 +184,7 @@ def create_app(img_url="qr/temp.png"):
             create_fee_sol=CREATE_FEE_SOL,
         )
 
+    @csrf.exempt
     @app.route("/ver")
     def verify_qr():
         qr_value = request.args.get("q")
@@ -225,7 +240,7 @@ def create_app(img_url="qr/temp.png"):
         )
 
     @app.route("/login", methods=["GET", "POST"])
-
+    @limiter.limit("5 per minute")
     def login():
         if get_user_cookie()[0]:
             if get_user_cookie()[1] == 'emc':
@@ -267,14 +282,11 @@ def create_app(img_url="qr/temp.png"):
         if action == "create":
             username = (request.form.get("username") or "").strip()
             password = request.form.get("password") or ""
-            if request.form.get("role") == 'emc':
-                role = 'admin'
-            elif request.form.get("role") == 'mec':
-                role = 'mf'
-            elif request.form.get("role") == 'cem':
-                role = 'seller'
-            else:
-                role = '0'
+            form_role = request.form.get("role") or ""
+            role = ALLOWED_ROLES_MAPPING.get(form_role, '0')
+            if role not in ALLOWED_ROLES:
+                users = get_all_users()
+                return render_template("admin.html", users=users, error="Invalid role")
 
             if not username or not password:
                 users = get_all_users()
@@ -313,6 +325,7 @@ def create_app(img_url="qr/temp.png"):
 
         users = get_all_users()
         return render_template("admin.html", users=users)
+    @csrf.exempt
     @app.route("/logout", methods=["GET", "POST"])
     def logout():
         close_cookie(None)
@@ -384,6 +397,10 @@ def create_app(img_url="qr/temp.png"):
 
     @app.route("/api/sol-entry", methods=["POST"])
     def record_sol_entry():
+        actor, role = get_user_cookie()
+        if not actor:
+            return jsonify({"error": "Unauthorized"}), 401
+        
         uid = (request.json or {}).get("uid") if request.is_json else request.form.get("uid")
         action = (request.json or {}).get("action") if request.is_json else request.form.get("action")
         signature = (request.json or {}).get("signature") if request.is_json else request.form.get("signature")
@@ -395,7 +412,6 @@ def create_app(img_url="qr/temp.png"):
         if not uid or action not in {"create", "sold", "verify"}:
             return jsonify({"error": "uid and valid action are required"}), 400
 
-        actor, role = get_user_cookie()
         role_map = {"mec": "mf", "cem": "seller", "emc": "admin"}
         record_qr_activity(
             uid,

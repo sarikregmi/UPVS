@@ -78,6 +78,7 @@
                         <div class="wallet-row mt-8"><span class="wallet-label">Sale Fee</span><span class="wallet-value">{{ sold_fee_sol }} SOL</span></div>
                     </div>
                     <form method="POST" action="/seller?q={{ q }}" id="sellerForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="form-group">
                             <label for="sol_signature">Solana Signature <span style="color:var(--muted); font-weight:400;">(optional)</span></label>
                             <input type="text" id="sol_signature" name="sol_signature" placeholder="Paste tx hash or pay with Phantom below">
